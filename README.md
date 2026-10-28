@@ -2,6 +2,8 @@
 
 Unlock FP/BF16 instruction issue rate on consumer Nvidia 30 series cards to their professional equivalents
 
+> This is a standalone fork of [Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock), based on upstream commit `6081407`. The kernel module is unchanged; this fork adds a read-only diagnostic and Blackwell research notes (see [What this fork adds](#what-this-fork-adds)). Text written in the first person below is the upstream author's.
+
 This Linux kernel module combines the cmpunlocker's V67/PLM technique with the pre-driver timing of the UEFI approach. It runs the unlock, writes the speed selectors (SS0 `0x88888888`, which selects the full BF16 rate, and the 4-bit SS1 `0x8` IMLA4) and performs FLR before the unmodified NVIDIA driver binds the card. It is neither a UEFI application nor a patched NVIDIA driver. 
 
 The benefit of this early kmod driver is that it does not require manual patching each time nvidia releases a new driver version.
@@ -21,7 +23,7 @@ The effect of this unlock is that it doubles the instruction issuing speed of FP
 First run:
 
 ```sh
-git clone https://github.com/Zagitta/gpu-unlock
+git clone https://github.com/RainbowWizard-coder/gpu-unlock
 cd gpu-unlock
 make install
 ```
@@ -40,6 +42,22 @@ in `/etc/default/grub`, then run `sudo update-grub`.
 - **UKI / generated entries:** add it to `/etc/kernel/cmdline` and regenerate
 your boot images/entries (e.g. `sudo mkinitcpio -P` for mkinitcpio UKIs).
 
+## What this fork adds
+
+- **Read-only SM issue-rate diagnostic:** [`tools/read_sm_rates.py`](tools/read_sm_rates.py)
+asks the running NVIDIA driver which issue-rate limits the card reports. It
+writes nothing to the GPU. Usage and limits are in
+[`tools/README.md`](tools/README.md); the unit tests run with
+`python3 -m unittest tests.test_sm_rates`.
+- **Blackwell research notes:**
+[`docs/Blackwell GB20x unlock research notes.md`](docs/Blackwell%20GB20x%20unlock%20research%20notes.md).
+In short, the Ampere recipe does not carry over: Blackwell boots through the
+FSP instead of the SEC2 Booter this unlock relies on, the consumer cap is set
+by fuses, and an RTX PRO 6000 Blackwell already reports every rate field at
+full speed.
+
+This fork does not unlock any Blackwell card.
+
 # FAQ
 
 - Q: Does this depend on a specific driver version? I see `610.43.03` is pinned.  
@@ -48,10 +66,10 @@ A: No the driver is only fetched to extract firmware this unlock depends on
 A: I don't run windows and don't plan to maintain it but [https://github.com/impacifist/Windows-GPU-UNLOCK](https://github.com/impacifist/Windows-GPU-UNLOCK) has built a port, YMMV.    
 - Q: What about Turing and Ada?  
 A: There are forks with support already, I will integrate this soon.    
+- Q: What about Blackwell (RTX 50 series, RTX PRO 6000)?  
+A: Not supported. See [What this fork adds](#what-this-fork-adds) for why the same approach does not apply.    
 - Q: Does this hurt my GPU?  
 A: It's very unlikely, this only unlocks a small handicap Nvidia has put in place to differentiate datacenter and professional cards from consumer versions. It may heat up your GPU slightly because it now does more compute but the standard throttling and power management remains completely intact and should downclock.    
-- Q: How can I assist?  
-A: Please consider [donating](#support-me) so I can purchase more GPUs <3
 
 ## Local build
 
