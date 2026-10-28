@@ -21,6 +21,9 @@ FIRMWARE_FILES := booter_load_ad102.bin booter_load_ga102.bin gsp_boot_ad102.bin
 LICENSES       := licenses/GPL-2.0.txt licenses/CMP40HX-MIT.txt licenses/NVIDIA-MIT.txt
 NV_SOURCE      := NVIDIA-kernel-module-source-$(NV)
 NV_INSTALLER   := NVIDIA-Linux-x86_64-$(NV)-no-compat32.run
+# Host-side unit tests for the tools. tests/integration is the separate native
+# device-model harness (see tests/integration/README.md) and is not run here.
+TOOL_TESTS     := $(wildcard tests/test_*.py)
 
 TARBALL := $(abspath $(DISTDIR))/gpu-unlock-$(VERSION).tar.xz
 DEBDIR  := $(abspath $(DISTDIR))/deb
@@ -30,7 +33,7 @@ DEBS    := $(foreach p,dkms firmware,$(DEBDIR)/gpu-unlock-$(p)_$(VERSION)_all.de
 .PHONY: all dist inputs firmware assets install-dkms install-firmware \
         install-mkinitcpio install-initramfs-tools install-dracut \
         install-licenses arch deb rpm install install-arch install-deb install-rpm \
-        test-module test-packages
+        test-module test-packages test-tools
 
 all:
 
@@ -149,3 +152,8 @@ test-module:
 
 test-packages:
 	INPUTS=$(INPUTS) tests/docker.sh package
+
+# The tool tests run on the host: they mock the driver ioctl, so no GPU,
+# no root and no NVIDIA driver is required.
+test-tools:
+	$(PYTHON) -m unittest $(TOOL_TESTS)

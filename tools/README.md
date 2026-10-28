@@ -17,6 +17,35 @@ This version opens `/dev/nvidia0`. If hot-plug assigned the sole GPU a different
 
 The output reports RM's raw field values, not a measured speedup. A reduced issue-rate field does not establish an available override, the performance of a particular CUDA kernel, or an LLM throughput gain.
 
+## GSP-mediated register probe
+
+`gsp_reg_probe.py` submits `NV2080_CTRL_CMD_GPU_EXEC_REG_OPS` (`0x20800122`) with
+read operations only. The opcode list is fixed in the tool: there is no argument
+that can produce a register write.
+
+What it establishes is which bus master performs the access. On a GSP part, RM
+performs the register access in GSP-RM rather than by the CPU, which is the same
+shape as the privileged write the Ampere recipe obtains from the SEC2 chain, so
+the two paths have to be compared before assuming they behave identically.
+
+RM gates the offsets: anything outside the user-mode register allow list needs
+`CAP_SYS_ADMIN`. A container that maps the host device nodes is one way to get
+that without touching the host driver:
+
+```sh
+docker run --rm --privileged -v "$PWD":/w:ro python:3.12-slim \
+    python3 /w/tools/gsp_reg_probe.py --preset speed-select
+```
+
+`--via sysfs` maps BAR0 through `/sys/bus/pci/devices/<slot>/resource0`
+(read-only mapping) so the CPU performs the same reads, and comparing the two
+outputs shows whether a register is reported identically by both masters. On
+this machine the kernel refused the mapping with `EPERM` while the NVIDIA driver
+owned the device, so the sysfs path needs a GPU no driver has claimed; use
+`--via rm` for a bound one. Raw offsets can be added with `--offset`,
+repeatable. Reading a register is not the same as being able to write it, and
+nothing in this tool writes.
+
 ## Blackwell support
 
 The upstream module's [admission table](https://github.com/Zagitta/gpu-unlock/blob/af28cbbfd3d922a659227ecfb7369adfd924cf03/kernel/gpu_unlock/main.c#L21-L39) covers GA102/GA103/GA104/GA106. This fork does not add GB206 or other Blackwell cards to it.
